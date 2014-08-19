@@ -152,14 +152,11 @@ void loop()
           req_index++;
         }
         Serial.print(c); // print it out also.  
-                            // last line of client request is blank and ends with \n
-                            // respond to client only after last line received
-        if (c == '\n' && currentLineIsBlank) { // send a standard http response header
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println("Connection: close");
+        if (c == '\n' && currentLineIsBlank) {       // If we get a newline which FOLLOWED another newline, we're done with the http request.  
+          client.println("HTTP/1.1 200 OK");         // So start printing out 
+          client.println("Content-Type: text/html"); // the HTTP response.  
+          client.println("Connection: close");       // 
           client.println(); 
-          // send web page
           if (StrContains(HTTP_req, "favicon.ico")){ // ignore favicon.ico requests.  Le Sigh.  
           }else if (StrContains(HTTP_req, "green")){
             setColorByName(ledDigitalOne, WHITE); 
@@ -177,20 +174,20 @@ void loop()
             }
             webFile.close();
           }
-          req_index = 0;
-          StrClear(HTTP_req, REQ_BUF_SZ);
+          //req_index = 0;
+          //StrClear(HTTP_req, REQ_BUF_SZ);
           break;
         }
-      // every line of text received from the client ends with \r\n
-        if (c == '\n') { //last character on line of received text starting new line with next character read
+        if (c == '\n') {           //we got a blank line.
              currentLineIsBlank = true;
-        } else if (c != '\r') { // a text character was received from client
+        } else if (c != '\r') {     // we got a text character SOMEWHERE on the line.
           currentLineIsBlank = false;
         }
       } // end if (client.available())
     } // end while (client.connected())
     delay(1);      // give the web browser time to receive the data
     client.stop(); // close the connection
+    Serial.println("Client disconnected");
     } // end if (client)
 }
 
