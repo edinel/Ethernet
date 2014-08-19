@@ -24,7 +24,7 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <SD.h>
-#define REQ_BUF_SZ   4096 
+#define REQ_BUF_SZ   100 
 
 
 
@@ -33,12 +33,10 @@ const boolean FALSE = 0;
 const boolean TRUE = 1;
 
 byte mac[] = { 0x90, 0xA2, 0xDA, 0x0F, 0xDC, 0xD4 }; // MAC address from Ethernet shield sticker under board
-IPAddress ip(172, 16, 30, 185); // Just grab 172.16.30.185.  I ought to figure out how to #define this.  Someday.  
+IPAddress ip(172, 16, 30, 186); // Just grab 172.16.30.185.  I ought to figure out how to #define this.  Someday.  
 const int chipSelect = 4;
 EthernetServer server(80);  // create a server at port 80
 File webFile; 
-char HTTP_req[REQ_BUF_SZ] = {0}; // buffered HTTP request stored as null terminated string
-char req_index = 0;              // index into HTTP_req buffer
 
 
 /* 
@@ -47,7 +45,7 @@ char req_index = 0;              // index into HTTP_req buffer
 
 //RGB LED pins
 int ledDigitalOne[] = {
-  2, 3, 5}; //the three digital pins of the digital LED 
+  2, 5, 6}; //the three digital pins of the digital LED 
   //5 = redPin, 6 = greenPin, 7 = bluePin
 
 const boolean ON = LOW;     //Define on as LOW (this is because we use a common Anode RGB LED (common pin is connected to +5 volts)
@@ -91,15 +89,14 @@ int ColorIndex = 0;
 
 void setup()
 {
-  Ethernet.begin(mac, ip);  // initialize Ethernet device
-  server.begin();           // start to listen for client 
-                
 // Open serial communications and wait for port to open:
   Serial.begin(9600);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for Leonardo only
-  }
- 
+  //while (!Serial) {
+  //  ; // wait for serial port to connect. Needed for Leonardo only
+  //}
+  Serial.println("Starting Ethernet...");
+  Ethernet.begin(mac, ip);  // initialize Ethernet device
+  server.begin();           // start to listen for client  
   Serial.print("Initializing SD card...");
   // make sure that the default chip select pin is set to
   // output, even if you don't use it:
@@ -127,57 +124,75 @@ void setup()
 
 void loop()
 {
-//LED Stuff
-//  unsigned long currentMillis = millis();
-//  if(currentMillis - previousMillis > interval) { // save the last time you blinked the LED 
-//    previousMillis = currentMillis;
-//    if (!err) { ChangeLEDState(); }
-//  }
-    
+  /*
+  // read the input on analog pin 0:
+  int sensorValue = analogRead(A0);
+  // print out the value you read:
+  Serial.println(sensorValue);
+  delay(100);        // delay in between reads for stability
+*/
+//setColorByName(ledDigitalOne, RED);
+//delay (500); 
+
   EthernetClient client = server.available();  // try to get client
+  char HTTP_req[REQ_BUF_SZ] = {0}; // buffered HTTP request stored as null terminated string
+  char req_index = 0;              // index into HTTP_req buffer
+  StrClear(HTTP_req, REQ_BUF_SZ);
+ 
 
   if (client) {  // got client?
-    setColorByName(ledDigitalOne, BLACK);
+    //setColorByName(ledDigitalOne, BLACK);
+    Serial.println("Got a client"); 
     boolean currentLineIsBlank = true;
     while (client.connected()) {
       if (client.available()) {   // client data available to read
-      char c = client.read(); // read 1 byte (character) from client
-      if (req_index < (REQ_BUF_SZ - 1)) {
-        HTTP_req[req_index] = c;          // put the http request into the buffer
-        req_index++;
-      }
-      Serial.print(c); // print it out also.  
+        char c = client.read(); // read 1 byte (character) from client
+        if (req_index < (REQ_BUF_SZ - 1)) {
+          HTTP_req[req_index] = c;          // put the http request into the buffer
+          req_index++;
+        }
+        Serial.print(c); // print it out also.  
                             // last line of client request is blank and ends with \n
                             // respond to client only after last line received
-      if (c == '\n' && currentLineIsBlank) { // send a standard http response heade
-        client.println("HTTP/1.1 200 OK");
-        client.println("Content-Type: text/html");
-        client.println("Connection: close");
-        client.println(); 
-        // send web page
-        webFile = SD.open("index.htm");        // open web page file
-        if (webFile) {
-          while(webFile.available()) {
-            client.write(webFile.read()); // send web page to client
+        if (c == '\n' && currentLineIsBlank) { // send a standard http response heade
+          if (StrContains(HTTP_req, "favicon.ico")){
+          }else if (StrContains(HTTP_req, "green")){
+            setColorByName(ledDigitalOne, RED); 
+          }else if (StrContains(HTTP_req, "red")){
+            setColorByName(ledDigitalOne, RED);
+          }else if (StrContains(HTTP_req, "blue")){
+            setColorByName(ledDigitalOne, BLUE);
+          }else{
+            setColorByName(ledDigitalOne, BLACK);
           }
-          webFile.close();
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connection: close");
+          client.println(); 
+          // send web page
+          webFile = SD.open("index.htm");        // open web page file
+          if (webFile) {
+            while(webFile.available()) {
+              client.write(webFile.read()); // send web page to client
+            }
+            webFile.close();
+          }
+          req_index = 0;
+          StrClear(HTTP_req, REQ_BUF_SZ);
+          break;
         }
-        break;
-      }
-    // every line of text received from the client ends with \r\n
-      if (c == '\n') { //last character on line of received text starting new line with next character read
-           currentLineIsBlank = true;
-      } else if (c != '\r') { // a text character was received from client
-        currentLineIsBlank = false;
-      }
-    } // end if (client.available())
-  } // end while (client.connected())
-        delay(1);      // give the web browser time to receive the data
-        client.stop(); // close the connection
-  } // end if (client)
-  Serial.print(HTTP_req); // print out the http buffer!
+      // every line of text received from the client ends with \r\n
+        if (c == '\n') { //last character on line of received text starting new line with next character read
+             currentLineIsBlank = true;
+        } else if (c != '\r') { // a text character was received from client
+          currentLineIsBlank = false;
+        }
+      } // end if (client.available())
+    } // end while (client.connected())
+    delay(1);      // give the web browser time to receive the data
+    client.stop(); // close the connection
+    } // end if (client)
 }
-
 /*
 void ProcessCheckbox(EthernetClient cl){
   if (HTTP_req.indexOf("LED2=2") > -1) {  // see if checkbox was clicked
@@ -248,6 +263,17 @@ void initLED(){
   } 
 }
 
+/*
+ * char StrClear (char* string, int length) 
+ * Pulled from the Arduino example; looks to be awfully useful for dealing with any kind of text passed around
+ * Success appears to return 1, failure returns 0.  (need to validate this one, obvs).  
+ */
+void StrClear(char *str, char length)
+{
+    for (int i = 0; i < length; i++) {
+        str[i] = 0;
+    }
+}
 
 /*
  * char StrContains (string, string-to-find) 
