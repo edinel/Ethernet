@@ -154,10 +154,15 @@ void loop()
         Serial.print(c); // print it out also.  
                             // last line of client request is blank and ends with \n
                             // respond to client only after last line received
-        if (c == '\n' && currentLineIsBlank) { // send a standard http response heade
-          if (StrContains(HTTP_req, "favicon.ico")){
+        if (c == '\n' && currentLineIsBlank) { // send a standard http response header
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connection: close");
+          client.println(); 
+          // send web page
+          if (StrContains(HTTP_req, "favicon.ico")){ // ignore favicon.ico requests.  Le Sigh.  
           }else if (StrContains(HTTP_req, "green")){
-            setColorByName(ledDigitalOne, RED); 
+            setColorByName(ledDigitalOne, WHITE); 
           }else if (StrContains(HTTP_req, "red")){
             setColorByName(ledDigitalOne, RED);
           }else if (StrContains(HTTP_req, "blue")){
@@ -165,11 +170,6 @@ void loop()
           }else{
             setColorByName(ledDigitalOne, BLACK);
           }
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println("Connection: close");
-          client.println(); 
-          // send web page
           webFile = SD.open("index.htm");        // open web page file
           if (webFile) {
             while(webFile.available()) {
@@ -193,6 +193,7 @@ void loop()
     client.stop(); // close the connection
     } // end if (client)
 }
+
 /*
 void ProcessCheckbox(EthernetClient cl){
   if (HTTP_req.indexOf("LED2=2") > -1) {  // see if checkbox was clicked
